@@ -61,10 +61,9 @@ class Login_Window1(tkinter.Toplevel):
             anchor=CENTER
         )
 
-    def open_main_lobby(self):
+    def open_main_lobby(self, data):
         self.parent.csocket.send(b"GAME")
-        self.destroy()
-        u = Game(self.parent.csocket)
+        u = Game(self.parent.csocket, data)
 
     def close(self):
         self.parent.deiconify()  # show parent
@@ -81,10 +80,11 @@ class Login_Window1(tkinter.Toplevel):
 
         self.parent.csocket.send(str_insert.encode())
         data = self.parent.csocket.recv(1024).decode()
+        data = data.split(",")
 
-        if data == "true":
-            self.open_main_lobby()
-        elif data == "false":
+        if data[0] == "true":
+            self.open_main_lobby(data)
+        elif data[0] == "false":
             Label(self,
                   text='Password or email have not been entered correctly',
                   font=('Arial', 12),

@@ -9,8 +9,10 @@ class Server:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((ip, port))
         self.sock.listen(10)
+
         self.user_counter = 0
-        self.player_position_list = ["640,360"] * 10
+        self.player_position_list = ["0,0"] * 10
+        self.message_list = ["1"] * 10
 
         self.tbluser = tblUser()
         self.tblAppearance = tblAppearance()
@@ -25,7 +27,8 @@ class Server:
             print('connected:', addr)
 
             self.user_counter += 1
-            threading.Thread(target=self.main_logic(conn,)).start()
+            print('Clients online: ', self.user_counter)
+            threading.Thread(target=self.main_logic, args=(conn,)).start()
 
     def main_logic(self, conn):
 
@@ -34,6 +37,7 @@ class Server:
             try:
                 # presenting options over different commands
                 choice = conn.recv(1024).decode('utf-8')
+                print(choice)
                 csplit = choice.split(",")
 
                 if csplit[0] == "LOGIN" and len(csplit) == 3:
@@ -48,14 +52,26 @@ class Server:
                     break
             except:
                 print("Client Disconnected")
+                self.player_position_list[self.user_counter] = "0,0"
                 self.user_counter -= 1
+                print('Clients online: ', self.user_counter)
                 break
 
         conn.close()
 
     def login(self, conn, email, password):
         if self.tbluser.check_by_email_password(email, password):
-            conn.send(b"true")
+            appearance_id = self.tbluser.get_appearance_id_by_email(email)
+            player_appearance = self.tblAppearance.get_items_by_id(appearance_id)
+
+            player_appearance_list = list(player_appearance)
+            player_appearance_list.pop(-1)
+            player_appearance_list[0] = 'true'
+            print(player_appearance_list)
+
+            player_appearance_string = ",".join(player_appearance_list)
+            conn.send(player_appearance_string.encode())
+            print(player_appearance_string)
         else:
             conn.send(b"false")
 
@@ -72,11 +88,22 @@ class Server:
 
     def game_update(self, conn):
         while True:
-            player_position = conn.recv(1024).decode('utf-8')
-            self.player_position_list[self.user_counter] = player_position
+            player_data = conn.recv(1024).decode('utf-8')
+            player_data = player_data.split(",", 1)
+            if player_data[0] == 'MSG':
+                player_data = player_data[1].split("$")
+                self.message_list[int(player_data[0])] = player_data[1]
 
-            player_position_string = ",".join(self.player_position_list)
-            conn.send(player_position_string.encode('utf-8'))
+                message_string = "$".join(self.message_list)
+                conn.send(message_string.encode())
+
+            else:
+                player_data = ",".join(player_data)
+                player_data = player_data.split(",")
+                self.player_position_list[int(player_data[2])] = player_data[0] + "," + player_data[1]
+
+                player_position_string = ",".join(self.player_position_list)
+                conn.send(player_position_string.encode('utf-8'))
 
 
 s = Server('0.0.0.0', 1731)

@@ -58,7 +58,7 @@ class Menu(tkinter.Tk):
             anchor=CENTER
         )
 
-        self.handle_thread_socket()
+        self.attributes('-topmost', True)
 
     def open_register_window1(self):
         window = Register_Window1(self)
@@ -69,14 +69,6 @@ class Menu(tkinter.Tk):
         window = Login_Window1(self)
         window.grab_set()
         self.withdraw()
-
-    def handle_thread_socket(self):
-        client_handler = threading.Thread(target=self.client, args=())
-        client_handler.daemon = True
-        client_handler.start()
-
-
-
 
 
 if __name__ == "__main__":

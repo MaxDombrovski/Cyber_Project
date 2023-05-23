@@ -62,6 +62,13 @@ class tblAppearance(object):
         conn.commit()
         conn.close()
 
+    def get_items_by_id(self, id):
+        conn = sqlite3.connect('game.db')
+        cursor = conn.cursor()
+        strsql = f"SELECT * FROM {self.__tablename} WHERE {self.__id} = '{id}'"
+
+        return cursor.execute(strsql).fetchone()
+
     def get_tablename(self):
         return self.__tablename
 

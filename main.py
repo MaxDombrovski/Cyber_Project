@@ -17,8 +17,13 @@ if __name__ == '__main__':
         if not re.fullmatch(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", ask_ip):
             print("ip address inputted incorrectly")
         else:
-            break
+            print("Waiting for connection")
+            try:
+                client_socket.connect((ask_ip, 1731))
+                break
+            except:
+                print("Couldn't find ip address")
 
-    client_socket.connect((ask_ip, 1731))
+    print("Connection established")
     m = menu.Menu(client_socket)
     m.mainloop()

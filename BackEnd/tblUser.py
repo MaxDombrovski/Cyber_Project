@@ -57,5 +57,12 @@ class tblUser(object):
         conn.close()
         return False
 
+    def get_appearance_id_by_email(self, email):
+        conn = sqlite3.connect('game.db')
+        cursor = conn.cursor()
+        strsql = f"SELECT {self.__appearance_id} FROM {self.__tablename} WHERE {self.__email} = '{email}'"
+
+        return cursor.execute(strsql).fetchone()[0]
+
 
 u = tblUser()

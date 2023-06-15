@@ -64,5 +64,12 @@ class tblUser(object):
 
         return cursor.execute(strsql).fetchone()[0]
 
+    def get_name_by_email(self, email):
+        conn = sqlite3.connect('game.db')
+        cursor = conn.cursor()
+        strsql = f"SELECT {self.__name} FROM {self.__tablename} WHERE {self.__email} = '{email}'"
+
+        return cursor.execute(strsql).fetchone()[0]
+
 
 u = tblUser()

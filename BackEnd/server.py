@@ -1,4 +1,6 @@
 import socket
+import tcp_by_size
+import hashlib
 import threading
 from tblAppearance import *
 from tblUser import *
@@ -11,8 +13,9 @@ class Server:
         self.sock.listen(10)
 
         self.user_counter = 0
-        self.player_position_list = ["0,0"] * 10
-        self.message_list = ["1"] * 10
+        self.player_position_list = ["480, 360"] * 10
+        self.message_list = [""] * 10
+        self.appearance_list = [" ,TopHat,Suit,Shorts,Crocs"] * 10
 
         self.tbluser = tblUser()
         self.tblAppearance = tblAppearance()
@@ -36,7 +39,8 @@ class Server:
         while True:
             try:
                 # presenting options over different commands
-                choice = conn.recv(1024).decode('utf-8')
+                # choice = conn.recv(1024).decode('utf-8')
+                choice = tcp_by_size.recv_by_size(conn)
                 print(choice)
                 csplit = choice.split(",")
 
@@ -45,65 +49,79 @@ class Server:
                 elif csplit[0] == "REGISTER" and len(csplit) == 9:
                     self.register(conn, csplit[1], csplit[2], csplit[3], csplit[4], csplit[5], csplit[6], csplit[7], csplit[8])
                 elif csplit[0] == "GAME" and len(csplit) == 1:
-                    conn.send(str(self.user_counter).encode('utf-8'))
+                    # conn.send(str(self.user_counter-1).encode('utf-8'))
+                    tcp_by_size.send_with_size(conn, str(self.user_counter-1))
 
                     self.game_update(conn)
                 else:
                     break
             except:
                 print("Client Disconnected")
-                self.player_position_list[self.user_counter] = "0,0"
                 self.user_counter -= 1
+                self.player_position_list[self.playernumber] = "480, 360"
+                self.message_list[self.playernumber] = ""
+                self.appearance_list[self.playernumber] = " ,TopHat,Suit,Shorts,Crocs"
                 print('Clients online: ', self.user_counter)
                 break
 
         conn.close()
 
     def login(self, conn, email, password):
-        if self.tbluser.check_by_email_password(email, password):
-            appearance_id = self.tbluser.get_appearance_id_by_email(email)
+        email_hash = hashlib.sha256(email.encode()).hexdigest()
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+        if self.tbluser.check_by_email_password(email_hash, password_hash):
+            # adding player appearance to the queue
+            appearance_id = self.tbluser.get_appearance_id_by_email(email_hash)
+            player_name = self.tbluser.get_name_by_email(email_hash)
             player_appearance = self.tblAppearance.get_items_by_id(appearance_id)
 
             player_appearance_list = list(player_appearance)
-            player_appearance_list.pop(-1)
-            player_appearance_list[0] = 'true'
+            player_appearance_list = player_appearance_list[:-1]
+            player_appearance_list[0] = player_name
+            player_appearance_string = ",".join(player_appearance_list)
+
+            self.appearance_list[self.user_counter - 1] = player_appearance_string
             print(player_appearance_list)
 
-            player_appearance_string = ",".join(player_appearance_list)
-            conn.send(player_appearance_string.encode())
-            print(player_appearance_string)
+            # server's answer
+            # conn.send(b"true")
+            tcp_by_size.send_with_size(conn, "true")
         else:
-            conn.send(b"false")
+            # conn.send(b"false")
+            tcp_by_size.send_with_size(conn, "false")
 
     def register(self, conn, hat, shirt, pants, shoes, accessories, name, email, password):
         try:
-            if not self.tbluser.check_by_email_password(email, password):
+            email_hash = hashlib.sha256(email.encode()).hexdigest()
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+            if not self.tbluser.check_by_email_password(email_hash, password_hash):
                 appearanceid = self.tblAppearance.give_id_to_player(hat, shirt, pants, shoes, accessories)
-                self.tbluser.insert_user(name, email, password, appearanceid, 0)
-                conn.send("registration successful".encode('utf-8'))
+                self.tbluser.insert_user(name, email_hash, password_hash, appearanceid, 0)
+                # conn.send("registration successful".encode('utf-8'))
+                tcp_by_size.send_with_size(conn, "registration successful")
             else:
-                conn.send("user already exists".encode('utf-8'))
+                # conn.send("user already exists".encode('utf-8'))
+                tcp_by_size.send_with_size(conn, "user already exists")
         except:
             conn.send("registration failed".encode('utf-8'))
 
     def game_update(self, conn):
         while True:
-            player_data = conn.recv(1024).decode('utf-8')
-            player_data = player_data.split(",", 1)
-            if player_data[0] == 'MSG':
-                player_data = player_data[1].split("$")
-                self.message_list[int(player_data[0])] = player_data[1]
+            # player_data = conn.recv(1024).decode('utf-8')
+            player_data = tcp_by_size.recv_by_size(conn)
+            player_data = player_data.split("$")
 
-                message_string = "$".join(self.message_list)
-                conn.send(message_string.encode())
+            self.playernumber = int(player_data[1])
 
-            else:
-                player_data = ",".join(player_data)
-                player_data = player_data.split(",")
-                self.player_position_list[int(player_data[2])] = player_data[0] + "," + player_data[1]
+            self.message_list[int(player_data[1])] = player_data[2]
+            self.player_position_list[int(player_data[1])] = player_data[0]
 
-                player_position_string = ",".join(self.player_position_list)
-                conn.send(player_position_string.encode('utf-8'))
+            appearance_messages_and_position = "$".join(self.appearance_list) + "$" + "$".join(self.message_list) + "$" + "$".join(self.player_position_list)
+
+            # conn.send(messages_and_position.encode('utf-8'))
+            tcp_by_size.send_with_size(conn, appearance_messages_and_position)
 
 
 s = Server('0.0.0.0', 1731)

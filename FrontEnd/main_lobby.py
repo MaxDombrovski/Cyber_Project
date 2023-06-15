@@ -1,6 +1,7 @@
 import pygame
 import sys
 from PIL import Image
+import tcp_by_size
 from random import randint
 
 
@@ -68,17 +69,21 @@ class Chat:
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, start_position, group):
+    def __init__(self, start_position, group, number):
         super().__init__(group)
+        self.display_surface = pygame.display.get_surface()
+        #player's number
+        self.number = number
         # player position
         self.x = start_position[0]
         self.y = start_position[1]
         # images for the player
         self.combine_images()
-        self.image = pygame.image.load("FrontEnd/player_assets/full_body.png").convert_alpha()
         self.rect = self.image.get_rect(center=start_position)
-
+        # chat interactions
         self.chat = Chat()
+        self.bubble_font = pygame.font.SysFont('Comic Sans MS', 48)
+        self.name_font = pygame.font.SysFont('Candara Bold Italic', 48)
 
     def get_rect_position(self):
         return str(self.x) + "," + str(self.y)
@@ -106,23 +111,36 @@ class Player(pygame.sprite.Sprite):
 
         self.update((self.x, self.y))
 
-    def update(self, update_position):
+    def update(self, update_position, name="", text="", camerax=0, cameray=0):
         self.rect.center = update_position
+        bubble_surface = self.bubble_font.render(text, True, (0, 0, 0))
+        self.display_surface.blit(bubble_surface, (update_position[0] - camerax - bubble_surface.get_width()//2, update_position[1] - 150 - cameray))
 
-    def combine_images(self):
+        name_surface = self.name_font.render(name, True, (255, 255, 255))
+        name_surface_outline = self.name_font.render(name, True, (0, 0, 0))
+
+        self.display_surface.blit(name_surface_outline, (update_position[0] - camerax - name_surface_outline.get_width() // 2 + 2, update_position[1] + 152 - cameray))
+        self.display_surface.blit(name_surface_outline, (update_position[0] - camerax - name_surface_outline.get_width() // 2 - 2, update_position[1] + 152 - cameray))
+        self.display_surface.blit(name_surface_outline, (update_position[0] - camerax - name_surface_outline.get_width() // 2 + 2, update_position[1] + 148 - cameray))
+        self.display_surface.blit(name_surface_outline, (update_position[0] - camerax - name_surface_outline.get_width() // 2 - 2, update_position[1] + 148 - cameray))
+        self.display_surface.blit(name_surface, (update_position[0] - camerax - name_surface.get_width()//2, update_position[1] + 150 - cameray))
+
+
+    def combine_images(self, appearance_list=["", "TopHat", "Suit", "Shorts", "Crocs"]):
         images = []
-        images.append(Image.open(f"FrontEnd/player_assets/body.png"))
-        images.append(Image.open("FrontEnd/player_assets/TopHatSmall.png"))
-        images.append(Image.open("FrontEnd/player_assets/SuitSmall.png"))
-        images.append(Image.open("FrontEnd/player_assets/ShortsSmall.png"))
-        images.append(Image.open("FrontEnd/player_assets/CrocsSmall.png"))
+        images.append(Image.open("FrontEnd/player_assets/body.png"))
+        images.append(Image.open(f"FrontEnd/player_assets/{appearance_list[1]}Small.png"))
+        images.append(Image.open(f"FrontEnd/player_assets/{appearance_list[2]}Small.png"))
+        images.append(Image.open(f"FrontEnd/player_assets/{appearance_list[3]}Small.png"))
+        images.append(Image.open(f"FrontEnd/player_assets/{appearance_list[4]}Small.png"))
 
         new_image = Image.new("RGBA", (100, 270))
 
         for i in range(len(images)):
             new_image = Image.alpha_composite(new_image, images[i])
 
-        new_image.save("FrontEnd/player_assets/full_body.png", format="png")
+        new_image.save(f"FrontEnd/player_assets/full_body{self.number}.png", format="png")
+        self.image = pygame.image.load(f"FrontEnd/player_assets/full_body{self.number}.png").convert_alpha()
 
 
 class CameraGroup(pygame.sprite.Group):
@@ -138,6 +156,8 @@ class CameraGroup(pygame.sprite.Group):
         # background
         self.bg = pygame.image.load("FrontEnd/environment_assets/grass.png").convert_alpha()
         self.bg_rect = self.bg.get_rect(topleft=(0, 0))
+
+
 
     def custom_draw(self, player):
 
@@ -155,24 +175,27 @@ class CameraGroup(pygame.sprite.Group):
             self.display_surface.blit(sprite.image, active_offset)
 
 
+
 class Game(object):
 
-    def __init__(self, csocket=None, appearance_list=None):
+    def __init__(self, csocket=None):
         self.csocket = csocket
-        self.main_player = int(self.csocket.recv(1024).decode('utf-8'))
+        # self.main_player = int(self.csocket.recv(1024).decode('utf-8'))
+        self.main_player = int(tcp_by_size.recv_by_size(self.csocket))
 
         # set up the screen
         pygame.init()
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         pygame.display.set_caption('lobby')
         clock = pygame.time.Clock()
+        pygame.time.set_timer(pygame.USEREVENT, 1000)
         pygame.event.set_grab(True)
 
         # preposition all the possible players
         camera_group = CameraGroup()
         players = []
         for i in range(10):
-            players.append(Player((0, 0), camera_group))
+            players.append(Player((480, 360), camera_group, i))
             i += 1
 
         # tree randomizer
@@ -185,16 +208,41 @@ class Game(object):
 
         # chat box
         chat = Chat()
-        client_msg = ' '
+        client_msg = ''
 
         # game loop
         running = True
         while running:
+            # move main player and give its position and its message to the server
+            players[self.main_player].movement()
+            main_player_position = players[self.main_player].get_rect_position()
+            main_player_position_and_message = main_player_position + "$" + str(self.main_player) + "$" + client_msg
+            # self.csocket.send(main_player_position_and_message.encode('utf-8'))
+            tcp_by_size.send_with_size(self.csocket, main_player_position_and_message)
+
+            # get other player's position
+            # server_data = self.csocket.recv(1024).decode('utf-8')
+            server_data = tcp_by_size.recv_by_size(self.csocket)
+            server_data = server_data.split("$")
+            appearance_list = server_data[:10]
+            message_list = server_data[10:-10]
+            position_list = server_data[-10:]
+
+            position_list = self.string_list_to_tuple_list_convertion(position_list)
+            print(message_list)
+            print(position_list)
+
+            # event loop
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
                 chat.check_mouse_collision(event)
+
+                if event.type == pygame.USEREVENT:
+                    print("\n", appearance_list, "\n")
+                    for i in range(10):
+                        players[i].combine_images(appearance_list[i].split(","))
 
                 if event.type == pygame.KEYDOWN:
 
@@ -206,38 +254,17 @@ class Game(object):
 
                     if event.key == pygame.K_ESCAPE:
                         running = False
+
             screen.fill('skyblue')
-
-            # show and send chat message
-            if client_msg != '':
-                chat.bubble(client_msg, screen.get_size()[0]//2, screen.get_size()[1]//2 - 150)
-                full_msg = 'MSG,' + str(self.main_player) + '$' + client_msg
-                csocket.send(full_msg.encode())
-
-                # draw other player's messages
-                every_message = csocket.recv(1024).decode()
-                every_message = every_message.split('$')
-                for i in range(0, len(players)):
-                    bubble_position = players[i].get_rect_position().split(',')
-                    bubble_position = [int(x) for x in bubble_position]
-                    chat.bubble(every_message[i], bubble_position[0], bubble_position[1] - 150)
-
-            # move main player and give its position to the server
-            players[self.main_player].movement()
-            main_player_position = players[self.main_player].get_rect_position()
-            main_player_position += "," + str(self.main_player)
-            self.csocket.send(main_player_position.encode('utf-8'))
-
-            # get other player's position
-            all_player_position_string = self.csocket.recv(1024).decode('utf-8')
-            int_player_pos_list = self.server_data_conversion(all_player_position_string)
-
-            # draw other players
-            for i in range(0, len(players)):
-                players[i].update(int_player_pos_list[i])
 
             # draw the main player so that camera follows him
             camera_group.custom_draw(players[self.main_player])
+            offsetx = players[self.main_player].rect.centerx - screen.get_size()[0] // 2
+            offsety = players[self.main_player].rect.centery - screen.get_size()[1] // 2
+
+            # draw other players
+            for i in range(0, len(players)):
+                players[i].update(position_list[i], appearance_list[i].split(",")[0], message_list[i], offsetx, offsety)
 
             # draw chat
             chat.draw()
@@ -248,16 +275,12 @@ class Game(object):
         pygame.quit()
         sys.exit()
 
-    # from a string to coordinates list:   '100,200,100,200' -> (100,200) , (100,200)
-    def server_data_conversion(self, all_player_position_string):
-        all_player_position_string = all_player_position_string.split(",")
-        all_player_position_list = []
-        for i in range(0, len(all_player_position_string), 2):
-            all_player_position_string[i] = int(all_player_position_string[i])
-            all_player_position_string[i+1] = int(all_player_position_string[i+1])
-            all_player_position_list.append((all_player_position_string[i], all_player_position_string[i + 1]))
+    # conversion from a string list to a tuple
+    def string_list_to_tuple_list_convertion(self, position_list):
+        for i in range(len(position_list)):
+            position_list[i] = eval(position_list[i])
 
-        return all_player_position_list
+        return position_list
 
 
 if __name__ == '__main__':

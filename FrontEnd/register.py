@@ -1,4 +1,5 @@
 import tkinter
+import tcp_by_size
 import threading
 from tkinter import *
 from tkinter import ttk
@@ -170,19 +171,19 @@ class Register_Window1(tkinter.Toplevel):
 
     # image changer
     def image_update(self, evt):
-        self.hat_image_path = Path("player_assets/" + self.combohat.get() + ".png")
+        self.hat_image_path = Path("FrontEnd/player_assets/" + self.combohat.get() + ".png")
         self.hat_img = ImageTk.PhotoImage(Image.open(self.hat_image_path))
         Label(self, image=self.hat_img).place(relx=.13, rely=.15, anchor=S)
 
-        self.shirt_image_path = Path("player_assets/" + self.comboshirt.get() + ".png")
+        self.shirt_image_path = Path("FrontEnd/player_assets/" + self.comboshirt.get() + ".png")
         self.shirt_img = ImageTk.PhotoImage(Image.open(self.shirt_image_path))
         Label(self, image=self.shirt_img).place(relx=.13, rely=.3, anchor=CENTER)
 
-        self.pants_image_path = Path("player_assets/" + self.combopants.get() + ".png")
+        self.pants_image_path = Path("FrontEnd/player_assets/" + self.combopants.get() + ".png")
         self.pants_img = ImageTk.PhotoImage(Image.open(self.pants_image_path))
         Label(self, image=self.pants_img).place(relx=.13, rely=.45, anchor=N)
 
-        self.shoes_image_path = Path("player_assets/" + self.comboshoes.get() + ".png")
+        self.shoes_image_path = Path("FrontEnd/player_assets/" + self.comboshoes.get() + ".png")
         self.shoes_img = ImageTk.PhotoImage(Image.open(self.shoes_image_path))
         Label(self, image=self.shoes_img).place(relx=.13, rely=.85, anchor=S)
 
@@ -212,9 +213,10 @@ class Register_Window1(tkinter.Toplevel):
         if not re.fullmatch(r'[^@]+@[^@]+\.[^@]+', self.email.get()):
             self.submit_button.config(text='irrational email')
         else:
-
-            self.parent.csocket.send(str_insert.encode())
-            data = self.parent.csocket.recv(1024).decode()
+            # self.parent.csocket.send(str_insert.encode())
+            tcp_by_size.send_with_size(self.parent.csocket, str_insert)
+            # data = self.parent.csocket.recv(1024).decode()
+            data = tcp_by_size.recv_by_size(self.parent.csocket)
 
             Label(self,
                   text=data,

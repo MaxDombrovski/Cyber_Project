@@ -1,4 +1,5 @@
 import tkinter
+import tcp_by_size
 import threading
 from tkinter import *
 from .main_lobby import Game
@@ -61,9 +62,10 @@ class Login_Window1(tkinter.Toplevel):
             anchor=CENTER
         )
 
-    def open_main_lobby(self, data):
-        self.parent.csocket.send(b"GAME")
-        u = Game(self.parent.csocket, data)
+    def open_main_lobby(self):
+        # self.parent.csocket.send(b"GAME")
+        tcp_by_size.send_with_size(self.parent.csocket, "GAME")
+        u = Game(self.parent.csocket)
 
     def close(self):
         self.parent.deiconify()  # show parent
@@ -78,13 +80,14 @@ class Login_Window1(tkinter.Toplevel):
         arr = ["LOGIN", self.email.get(), self.password.get()]
         str_insert = ",".join(arr)
 
-        self.parent.csocket.send(str_insert.encode())
-        data = self.parent.csocket.recv(1024).decode()
-        data = data.split(",")
+        # self.parent.csocket.send(str_insert.encode())
+        # data = self.parent.csocket.recv(1024).decode()
+        tcp_by_size.send_with_size(self.parent.csocket, str_insert)
+        data = tcp_by_size.recv_by_size(self.parent.csocket)
 
-        if data[0] == "true":
-            self.open_main_lobby(data)
-        elif data[0] == "false":
+        if data == "true":
+            self.open_main_lobby()
+        elif data == "false":
             Label(self,
                   text='Password or email have not been entered correctly',
                   font=('Arial', 12),

@@ -1,7 +1,5 @@
 import tkinter
 from tkinter import *
-import socket
-import threading
 from .register import Register_Window1
 from .login import Login_Window1
 
